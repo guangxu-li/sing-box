@@ -18,6 +18,11 @@ type NetworkManager interface {
 	Initialize(ruleSets []RuleSet)
 	InterfaceFinder() control.InterfaceFinder
 	UpdateInterfaces() error
+	// UpdatePinnedRoutes re-asserts pinned routes and removes those no longer wanted.
+	// Endpoint membership is not observable here, so a caller which adds or removes
+	// endpoints at runtime can call this to reconcile immediately. Nothing in-tree
+	// does; a route change reconciles the same state anyway, just later.
+	UpdatePinnedRoutes() error
 	DefaultNetworkInterface() *NetworkInterface
 	NetworkInterfaces() []NetworkInterface
 	NetworkEnvironment() uint64
@@ -50,6 +55,13 @@ type NetworkOptions struct {
 
 type InterfaceUpdateListener interface {
 	InterfaceUpdated(ctx context.Context)
+}
+
+// PinnedEndpoint is implemented by endpoints whose transport must never travel
+// inside another tunnel, and reports the remote addresses to pin to the physical
+// gateway. Domain endpoints are omitted, since they are resolved per dial.
+type PinnedEndpoint interface {
+	PinnedAddresses() []netip.Addr
 }
 
 type WIFIState struct {

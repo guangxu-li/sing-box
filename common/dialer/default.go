@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/netip"
 	"slices"
+	"sync"
 	"syscall"
 	"time"
 
@@ -82,6 +83,21 @@ func NewDefault(ctx context.Context, options option.DialerOptions) (*DefaultDial
 		dialer.Control = control.Append(dialer.Control, bindFunc)
 		listener.Control = control.Append(listener.Control, bindFunc)
 	}
+	if options.BindInterfaceAddress != nil {
+		if !(C.IsLinux || C.IsDarwin || C.IsWindows) {
+			return nil, E.New("`bind_interface_address` is only supported on Linux, macOS and Windows")
+		}
+		if options.BindInterface != "" {
+			return nil, E.New("`bind_interface_address` is conflict with `bind_interface`")
+		}
+		binder := &interfaceAddressBinder{
+			finder: interfaceFinder,
+			prefix: options.BindInterfaceAddress.Build(netip.Prefix{}),
+		}
+		bindFunc := control.BindToInterfaceFunc(interfaceFinder, binder.bind)
+		dialer.Control = control.Append(dialer.Control, bindFunc)
+		listener.Control = control.Append(listener.Control, bindFunc)
+	}
 	if options.RoutingMark > 0 {
 		if !C.IsLinux {
 			return nil, E.New("`routing_mark` is only supported on Linux")
@@ -89,10 +105,10 @@ func NewDefault(ctx context.Context, options option.DialerOptions) (*DefaultDial
 		dialer.Control = control.Append(dialer.Control, setMarkWrapper(networkManager, uint32(options.RoutingMark), false))
 		listener.Control = control.Append(listener.Control, setMarkWrapper(networkManager, uint32(options.RoutingMark), false))
 	}
-	disableDefaultBind := options.BindInterface != "" || options.Inet4BindAddress != nil || options.Inet6BindAddress != nil
+	disableDefaultBind := options.BindInterface != "" || options.BindInterfaceAddress != nil || options.Inet4BindAddress != nil || options.Inet6BindAddress != nil
 	if disableDefaultBind || options.TCPFastOpen {
 		if options.NetworkStrategy != nil || len(options.NetworkType) > 0 && options.FallbackNetworkType == nil && options.FallbackDelay == 0 {
-			return nil, E.New("`network_strategy` is conflict with `bind_interface`, `inet4_bind_address`, `inet6_bind_address` and `tcp_fast_open`")
+			return nil, E.New("`network_strategy` is conflict with `bind_interface`, `bind_interface_address`, `inet4_bind_address`, `inet6_bind_address` and `tcp_fast_open`")
 		}
 	}
 
@@ -246,6 +262,74 @@ func NewDefault(ctx context.Context, options option.DialerOptions) (*DefaultDial
 		fallbackNetworkType:    fallbackNetworkType,
 		networkFallbackDelay:   networkFallbackDelay,
 	}, nil
+}
+
+// interfaceRefreshInterval matches the interface monitor's own debounce, so a
+// refresh here only ever covers the window before the monitor gets to it.
+const interfaceRefreshInterval = time.Second
+
+// interfaceAddressBinder resolves, for every dial, the interface currently holding
+// an address inside prefix. When multiple interfaces match, the first one is
+// selected, as in InterfaceFinder.ByAddr.
+type interfaceAddressBinder struct {
+	finder      control.InterfaceFinder
+	prefix      netip.Prefix
+	refreshLock sync.Mutex
+	lastRefresh common.TypedValue[time.Time]
+}
+
+func (b *interfaceAddressBinder) bind(network string, address string) (string, int, error) {
+	iif := matchInterfaceByAddressPrefix(b.finder.Interfaces(), b.prefix)
+	if iif == nil {
+		err := b.refresh()
+		if err != nil {
+			return "", -1, err
+		}
+		iif = matchInterfaceByAddressPrefix(b.finder.Interfaces(), b.prefix)
+	}
+	if iif == nil {
+		return "", -1, E.New("no interface with an address in ", b.prefix)
+	}
+	return iif.Name, iif.Index, nil
+}
+
+// refresh reloads the finder, which is served from a cache the interface monitor
+// only updates a second after a route change.
+//
+// InterfaceFinder.ByName can probe a single interface before paying for a full
+// enumeration, so it never enumerates when the interface is simply absent. A
+// prefix has no such cheap probe, so refreshes are rate limited instead:
+// otherwise, while nothing matches, every dial of a retrying client would
+// enumerate every interface and fire the finder's update callbacks.
+func (b *interfaceAddressBinder) refresh() error {
+	if time.Since(b.lastRefresh.Load()) < interfaceRefreshInterval {
+		return nil
+	}
+	// Serialized rather than merely rate limited, so that concurrent dials neither
+	// each pay for an enumeration nor skip one that is still in flight and then
+	// fail against the cache it was about to replace.
+	b.refreshLock.Lock()
+	defer b.refreshLock.Unlock()
+	if time.Since(b.lastRefresh.Load()) < interfaceRefreshInterval {
+		return nil
+	}
+	err := b.finder.Update()
+	b.lastRefresh.Store(time.Now())
+	return err
+}
+
+func matchInterfaceByAddressPrefix(interfaces []control.Interface, prefix netip.Prefix) *control.Interface {
+	for i, netInterface := range interfaces {
+		if netInterface.Flags&net.FlagRunning == 0 {
+			continue
+		}
+		for _, address := range netInterface.Addresses {
+			if prefix.Contains(address.Addr()) {
+				return &interfaces[i]
+			}
+		}
+	}
+	return nil
 }
 
 func setMarkWrapper(networkManager adapter.NetworkManager, mark uint32, isDefault bool) control.Func {

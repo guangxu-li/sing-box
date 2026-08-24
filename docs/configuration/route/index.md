@@ -4,6 +4,11 @@ icon: material/alert-decagram
 
 # Route
 
+!!! quote "Changes in sing-box 1.15.0"
+
+    :material-plus: [pin_endpoints](#pin_endpoints)  
+    :material-plus: [pinned_routes](#pinned_routes)
+
 !!! quote "Changes in sing-box 1.14.0"
 
     :material-plus: [default_http_client](#default_http_client)  
@@ -38,6 +43,8 @@ icon: material/alert-decagram
     "rule_set": [],
     "final": "",
     "auto_detect_interface": false,
+    "pin_endpoints": false,
+    "pinned_routes": [],
     "override_android_vpn": false,
     "default_interface": "",
     "default_mark": 0,
@@ -88,6 +95,63 @@ Default outbound tag. the first outbound will be used if empty.
 Bind outbound connections to the default NIC by default to prevent routing loops under tun.
 
 Takes no effect if `outbound.bind_interface` is set.
+
+#### pin_endpoints
+
+!!! question "Since sing-box 1.15.0"
+
+!!! quote ""
+
+    Only supported on macOS.
+
+Keep a host route towards every endpoint's remote address through the physical default
+gateway, re-asserted whenever the routing table changes.
+
+This prevents an endpoint's own transport from being captured by another tunnel's default
+route. A WireGuard endpoint running inside another WireGuard tunnel still completes its
+handshakes, since those are small, while every full sized data packet is silently dropped
+by the outer tunnel's MTU, so the endpoint reports itself connected while carrying nothing.
+
+Currently honoured by `wireguard` endpoints, for peers configured with a literal address.
+Peers configured with a domain are resolved per dial and are not pinned.
+
+A gateway is resolved per address family, since a host route can only be installed through
+a gateway of the same family. Nothing is pinned for a family with no default route leaving
+through a physical interface, so that a pin is never installed into a tunnel.
+
+An address is not pinned at all when a route to it already exists which sing-box could not
+put back as it was: one through an interface rather than a gateway, or one carrying
+`-reject` or `-blackhole`. Replacing such a route would destroy it, since the kernel deletes
+a host route by destination, and it could not be put back as it was. Since the address is
+then unprotected, which is what this option exists to prevent, sing-box refuses to start
+rather than running on without it.
+
+Per-route metrics such as `-mtu` are not preserved across a replacement, and cannot be
+detected beforehand: the kernel writes them itself during path MTU discovery, so a set
+value is indistinguishable from a discovered one.
+
+Routes already pointing at the right gateway are left alone and are not removed on
+shutdown, since they may belong to something else. Pins installed by sing-box are removed
+when it stops normally. One left behind by a crash is treated on the next run as belonging
+to something else: it is left alone if it is still correct, and put back when that run stops
+if that run had to replace it.
+
+#### pinned_routes
+
+!!! question "Since sing-box 1.15.0"
+
+!!! quote ""
+
+    Only supported on macOS.
+
+Additional addresses to pin, as `pin_endpoints` does for endpoints.
+
+A host route is process agnostic, so this covers addresses belonging to programs sing-box
+knows nothing about, such as another VPN client running on the same machine whose transport
+would otherwise be captured by a tunnel. `pin_endpoints` cannot derive those, since they
+appear in no sing-box configuration.
+
+Pinning is enabled by setting either this or `pin_endpoints`; the two lists are combined.
 
 #### override_android_vpn
 

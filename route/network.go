@@ -59,6 +59,11 @@ type NetworkManager struct {
 	stateAccess              sync.RWMutex
 	environmentUpdateAccess  sync.Mutex
 	environmentUpdateTimer   *time.Timer
+	pinEndpoints             bool
+	pinnedRouteAddresses     []netip.Addr
+	pinnedRoutes             map[netip.Addr]pinnedRoute
+	pinClosed                bool
+	pinAccess                sync.Mutex
 	interfaceUpdateAccess    sync.Mutex
 	interfaceUpdateCancel    context.CancelFunc
 	interfaceUpdateRunAccess sync.Mutex
@@ -77,12 +82,25 @@ func NewNetworkManager(ctx context.Context, logger logger.ContextLogger, options
 		return nil, E.New("`default_interface` is only supported on Linux, Windows and macOS")
 	} else if options.DefaultMark != 0 && !C.IsLinux {
 		return nil, E.New("`default_mark` is only supported on linux")
+	} else if (options.PinEndpoints || len(options.PinnedRoutes) > 0) && !pinEndpointsSupported {
+		return nil, E.New("`pin_endpoints` and `pinned_routes` are only supported on macOS")
+	}
+	for _, pinnedRouteAddress := range options.PinnedRoutes {
+		// A host route to a link local address is scoped to an interface, and the
+		// scope does not survive the routing table read back used to decide whether
+		// a pin is already correct, so such a pin would be rewritten on every pass.
+		if netip.Addr(pinnedRouteAddress).IsLinkLocalUnicast() || netip.Addr(pinnedRouteAddress).Zone() != "" {
+			return nil, E.New("`pinned_routes` cannot pin the interface scoped address ", netip.Addr(pinnedRouteAddress))
+		}
 	}
 	nm := &NetworkManager{
-		ctx:                 ctx,
-		logger:              logger,
-		interfaceFinder:     control.NewDefaultInterfaceFinder(),
-		autoDetectInterface: options.AutoDetectInterface,
+		ctx:                  ctx,
+		logger:               logger,
+		interfaceFinder:      control.NewDefaultInterfaceFinder(),
+		autoDetectInterface:  options.AutoDetectInterface,
+		pinEndpoints:         options.PinEndpoints,
+		pinnedRouteAddresses: options.PinnedRoutes,
+		pinnedRoutes:         make(map[netip.Addr]pinnedRoute),
 		defaultOptions: adapter.NetworkOptions{
 			BindInterface:  options.DefaultInterface,
 			RoutingMark:    uint32(options.DefaultMark),
@@ -203,6 +221,12 @@ func (r *NetworkManager) Start(stage adapter.StartStage) error {
 			}
 		}
 	case adapter.StartStatePostStart:
+		// Fails the start rather than running on with an unprotected transport, which
+		// is the failure this option exists to prevent.
+		err := r.UpdatePinnedRoutes()
+		if err != nil {
+			return E.Cause(err, "pin routes")
+		}
 		if r.needWIFIState && !(r.platformInterface != nil && r.platformInterface.UsePlatformWIFIMonitor()) {
 			wifiMonitor, err := settings.NewWIFIMonitor(r.onWIFIStateChanged)
 			if err != nil {
@@ -235,6 +259,9 @@ func (r *NetworkManager) Initialize(ruleSets []adapter.RuleSet) {
 func (r *NetworkManager) Close() error {
 	monitor := taskmonitor.New(r.logger, C.StopTimeout)
 	var err error
+	err = E.Append(err, r.clearPinnedRoutes(), func(err error) error {
+		return E.Cause(err, "clear pinned routes")
+	})
 	if r.packageManager != nil {
 		monitor.Start("close package manager")
 		err = E.Append(err, r.packageManager.Close(), func(err error) error {

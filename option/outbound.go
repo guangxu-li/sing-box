@@ -84,6 +84,7 @@ type DialerOptions struct {
 
 type AbstractDialerOptions struct {
 	BindInterface              string                            `json:"bind_interface,omitempty"`
+	BindInterfaceAddress       *badoption.Prefix                 `json:"bind_interface_address,omitempty" examples:"10.0.0.0/8"`
 	Inet4BindAddress           *badoption.Addr                   `json:"inet4_bind_address,omitempty"`
 	Inet6BindAddress           *badoption.Addr                   `json:"inet6_bind_address,omitempty"`
 	BindAddressNoPort          bool                              `json:"bind_address_no_port,omitempty"`

@@ -7,13 +7,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/sagernet/sing-box/common/pf"
 	E "github.com/sagernet/sing/common/exceptions"
 	"github.com/sagernet/sing/common/logger"
 
 	"golang.org/x/sys/unix"
 )
 
-func buildBridgeAnchorRules(tunName string, egress string, boundInterface string, inet4Port netip.Addr, inet6Port netip.Addr) ([]pfAnchorRule, error) {
+func buildBridgeAnchorRules(tunName string, egress string, boundInterface string, inet4Port netip.Addr, inet6Port netip.Addr) ([]pf.AnchorRule, error) {
 	rules := bridgeDropRules(tunName, inet4Port, inet6Port)
 	egressInterface, err := net.InterfaceByName(egress)
 	if err != nil {
@@ -85,8 +86,8 @@ func buildBridgeAnchorRules(tunName string, egress string, boundInterface string
 	return rules, nil
 }
 
-func bridgeDropRules(tunName string, inet4Port netip.Addr, inet6Port netip.Addr) []pfAnchorRule {
-	var rules []pfAnchorRule
+func bridgeDropRules(tunName string, inet4Port netip.Addr, inet6Port netip.Addr) []pf.AnchorRule {
+	var rules []pf.AnchorRule
 	if inet4Port.IsValid() {
 		rules = append(rules, pfDropInRule(tunName, inet4Port))
 	}
@@ -164,65 +165,65 @@ func collectLocalSegments(egress string, boundInterface string, inet4Active bool
 	return
 }
 
-func pfScrubRule(egress string, port netip.Addr, maxMSS uint16) pfAnchorRule {
-	rule := pfRule{
-		Action: pfActionScrub,
-		AF:     pfFamily(port.Is4()),
+func pfScrubRule(egress string, port netip.Addr, maxMSS uint16) pf.AnchorRule {
+	rule := pf.Rule{
+		Action: pf.ActionScrub,
+		AF:     pf.Family(port.Is4()),
 		Proto:  unix.IPPROTO_TCP,
 		MaxMSS: maxMSS,
 	}
 	copy(rule.IfName[:], egress)
-	rule.Src.Addr = pfHostAddress(port)
-	return pfAnchorRule{RulesetIndex: pfRulesetScrub, Rule: rule}
+	rule.Src.Addr = pf.HostAddress(port)
+	return pf.AnchorRule{RulesetIndex: pf.RulesetScrub, Rule: rule}
 }
 
-func pfNatRule(interfaceName string, port netip.Addr) pfAnchorRule {
-	rule := pfRule{
-		Action: pfActionNat,
-		AF:     pfFamily(port.Is4()),
+func pfNatRule(interfaceName string, port netip.Addr) pf.AnchorRule {
+	rule := pf.Rule{
+		Action: pf.ActionNat,
+		AF:     pf.Family(port.Is4()),
 	}
-	rule.RPool.ProxyPort = [2]uint16{pfNatProxyPortLow, pfNatProxyPortHigh}
+	rule.RPool.ProxyPort = [2]uint16{pf.NatProxyPortLow, pf.NatProxyPortHigh}
 	copy(rule.IfName[:], interfaceName)
-	rule.Src.Addr = pfHostAddress(port)
-	return pfAnchorRule{
-		RulesetIndex: pfRulesetNat,
+	rule.Src.Addr = pf.HostAddress(port)
+	return pf.AnchorRule{
+		RulesetIndex: pf.RulesetNat,
 		Rule:         rule,
-		Pool:         pfPoolAddr{Addr: pfDynamicInterfaceAddress(interfaceName, port.Is4())},
+		Pool:         pf.PoolAddr{Addr: pf.DynamicInterfaceAddress(interfaceName, port.Is4())},
 	}
 }
 
-func pfPassInRule(tunName string, port netip.Addr, destination netip.Prefix) pfAnchorRule {
-	rule := pfRule{
-		Action:    pfActionPass,
-		Direction: pfDirectionIn,
-		AF:        pfFamily(port.Is4()),
-		KeepState: pfStateNormal,
+func pfPassInRule(tunName string, port netip.Addr, destination netip.Prefix) pf.AnchorRule {
+	rule := pf.Rule{
+		Action:    pf.ActionPass,
+		Direction: pf.DirectionIn,
+		AF:        pf.Family(port.Is4()),
+		KeepState: pf.StateNormal,
 	}
 	copy(rule.IfName[:], tunName)
-	rule.Src.Addr = pfHostAddress(port)
+	rule.Src.Addr = pf.HostAddress(port)
 	if destination.IsValid() {
-		rule.Dst.Addr = pfPrefixAddress(destination)
+		rule.Dst.Addr = pf.PrefixAddress(destination)
 	}
-	return pfAnchorRule{RulesetIndex: pfRulesetFilter, Rule: rule}
+	return pf.AnchorRule{RulesetIndex: pf.RulesetFilter, Rule: rule}
 }
 
-func pfDropInRule(tunName string, port netip.Addr) pfAnchorRule {
-	rule := pfRule{
-		Action:    pfActionDrop,
-		Direction: pfDirectionIn,
-		AF:        pfFamily(port.Is4()),
+func pfDropInRule(tunName string, port netip.Addr) pf.AnchorRule {
+	rule := pf.Rule{
+		Action:    pf.ActionDrop,
+		Direction: pf.DirectionIn,
+		AF:        pf.Family(port.Is4()),
 	}
 	copy(rule.IfName[:], tunName)
-	rule.Src.Addr = pfHostAddress(port)
-	return pfAnchorRule{RulesetIndex: pfRulesetFilter, Rule: rule}
+	rule.Src.Addr = pf.HostAddress(port)
+	return pf.AnchorRule{RulesetIndex: pf.RulesetFilter, Rule: rule}
 }
 
-func pfRouteToRule(tunName string, egress string, gateway netip.Addr, port netip.Addr) pfAnchorRule {
+func pfRouteToRule(tunName string, egress string, gateway netip.Addr, port netip.Addr) pf.AnchorRule {
 	anchorRule := pfPassInRule(tunName, port, netip.Prefix{})
-	anchorRule.Rule.RouteAction = pfRouteActionRouteTo
+	anchorRule.Rule.RouteAction = pf.RouteActionRouteTo
 	copy(anchorRule.Rule.TagName[:], bridgeTagName(tunName))
 	if gateway.IsValid() {
-		anchorRule.Pool.Addr = pfHostAddress(gateway)
+		anchorRule.Pool.Addr = pf.HostAddress(gateway)
 	}
 	copy(anchorRule.Pool.IfName[:], egress)
 	return anchorRule
@@ -233,20 +234,20 @@ func pfRouteToRule(tunName string, egress string, gateway netip.Addr, port netip
 // while route-to'd packets do not (pf_route emits via ifnet_output directly).
 // A reply-to state built from the tag left by the route-to rule sends replies
 // back through pf_route on the egress in side, skipping ip_output the same way.
-func pfReplyToRule(tunName string, egress string, port netip.Addr) pfAnchorRule {
-	rule := pfRule{
-		Action:      pfActionPass,
-		Direction:   pfDirectionOut,
-		AF:          pfFamily(port.Is4()),
-		KeepState:   pfStateNormal,
-		RouteAction: pfRouteActionReplyTo,
+func pfReplyToRule(tunName string, egress string, port netip.Addr) pf.AnchorRule {
+	rule := pf.Rule{
+		Action:      pf.ActionPass,
+		Direction:   pf.DirectionOut,
+		AF:          pf.Family(port.Is4()),
+		KeepState:   pf.StateNormal,
+		RouteAction: pf.RouteActionReplyTo,
 	}
 	copy(rule.IfName[:], egress)
 	copy(rule.MatchTagName[:], bridgeTagName(tunName))
-	anchorRule := pfAnchorRule{
-		RulesetIndex: pfRulesetFilter,
+	anchorRule := pf.AnchorRule{
+		RulesetIndex: pf.RulesetFilter,
 		Rule:         rule,
-		Pool:         pfPoolAddr{Addr: pfHostAddress(port)},
+		Pool:         pf.PoolAddr{Addr: pf.HostAddress(port)},
 	}
 	copy(anchorRule.Pool.IfName[:], tunName)
 	return anchorRule

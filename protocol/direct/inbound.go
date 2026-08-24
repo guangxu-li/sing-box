@@ -3,6 +3,7 @@ package direct
 import (
 	"context"
 	"net"
+	"net/netip"
 	"os"
 	"time"
 
@@ -66,6 +67,9 @@ func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLo
 		Listen:            options.ListenOptions,
 		ConnectionHandler: inbound,
 		PacketHandler:     inbound,
+
+		DNSHijackLoopback:      options.DNSHijackLoopback,
+		DNSHijackExcludeSource: options.DNSHijackExcludeSource.Build(netip.Addr{}),
 	})
 	return inbound, nil
 }

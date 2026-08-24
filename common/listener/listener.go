@@ -10,6 +10,7 @@ import (
 
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/common/settings"
+	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing/common"
 	E "github.com/sagernet/sing/common/exceptions"
@@ -32,11 +33,14 @@ type Listener struct {
 	threadUnsafePacketWriter bool
 	disablePacketOutput      bool
 	setSystemProxy           bool
+	dnsHijackLoopback        bool
+	dnsHijackExcludeSource   netip.Addr
 	systemProxySOCKS         bool
 	tproxy                   bool
 
 	tcpListener          net.Listener
 	systemProxy          settings.SystemProxy
+	dnsHijack            settings.DNSHijack
 	udpConn              *net.UDPConn
 	udpAddr              M.Socksaddr
 	packetOutbound       chan *N.PacketBuffer
@@ -55,6 +59,8 @@ type Options struct {
 	ThreadUnsafePacketWriter bool
 	DisablePacketOutput      bool
 	SetSystemProxy           bool
+	DNSHijackLoopback        bool
+	DNSHijackExcludeSource   netip.Addr
 	SystemProxySOCKS         bool
 	TProxy                   bool
 }
@@ -73,12 +79,17 @@ func New(
 		threadUnsafePacketWriter: options.ThreadUnsafePacketWriter,
 		disablePacketOutput:      options.DisablePacketOutput,
 		setSystemProxy:           options.SetSystemProxy,
+		dnsHijackLoopback:        options.DNSHijackLoopback,
+		dnsHijackExcludeSource:   options.DNSHijackExcludeSource,
 		systemProxySOCKS:         options.SystemProxySOCKS,
 		tproxy:                   options.TProxy,
 	}
 }
 
 func (l *Listener) Start() error {
+	if l.dnsHijackLoopback && !C.IsDarwin {
+		return E.New("`dns_hijack_loopback` is only supported on macOS")
+	}
 	if common.Contains(l.network, N.NetworkTCP) {
 		_, err := l.ListenTCP()
 		if err != nil {
@@ -117,7 +128,44 @@ func (l *Listener) Start() error {
 		}
 		l.systemProxy = systemProxy
 	}
+	if l.dnsHijackLoopback {
+		// Built from the sockets themselves rather than from the options: TCP and UDP
+		// get different ports when listen_port is left to the system, and only the
+		// networks actually opened may be redirected. Installed only once the
+		// listener is accepting, since redirecting DNS into a port nothing answers
+		// on breaks all name resolution on the host.
+		dnsHijack, err := settings.NewDNSHijack(
+			l.boundTCPAddress(),
+			l.boundUDPAddress(),
+			l.dnsHijackExcludeSource,
+		)
+		if err != nil {
+			return E.Cause(err, "initialize DNS hijack")
+		}
+		err = dnsHijack.Enable()
+		if err != nil {
+			return E.Errors(E.Cause(err, "enable DNS hijack"), dnsHijack.Close())
+		}
+		l.dnsHijack = dnsHijack
+	}
 	return nil
+}
+
+// boundTCPAddress and boundUDPAddress report what the sockets actually bound,
+// which differs from the configured address when the port was left to the system.
+// A zero value means that network is not listening.
+func (l *Listener) boundTCPAddress() netip.AddrPort {
+	if l.tcpListener == nil {
+		return netip.AddrPort{}
+	}
+	return M.AddrPortFromNet(l.tcpListener.Addr())
+}
+
+func (l *Listener) boundUDPAddress() netip.AddrPort {
+	if l.udpConn == nil {
+		return netip.AddrPort{}
+	}
+	return M.AddrPortFromNet(l.udpConn.LocalAddr())
 }
 
 func (l *Listener) Close() error {
@@ -128,6 +176,9 @@ func (l *Listener) Close() error {
 			err = l.systemProxy.Disable()
 		}
 		err = E.Errors(err, l.systemProxy.Close())
+	}
+	if l.dnsHijack != nil {
+		err = E.Errors(err, l.dnsHijack.Close())
 	}
 	return E.Errors(err, common.Close(
 		l.tcpListener,

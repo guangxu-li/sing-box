@@ -1,6 +1,10 @@
 package option
 
-import "github.com/sagernet/sing/common/json/badoption"
+import (
+	"net/netip"
+
+	"github.com/sagernet/sing/common/json/badoption"
+)
 
 type RouteOptions struct {
 	GeoIP                      *GeoIPOptions                     `json:"geoip,omitempty" schema:"omit"`
@@ -12,6 +16,8 @@ type RouteOptions struct {
 	FindNeighbor               bool                              `json:"find_neighbor,omitempty"`
 	DHCPLeaseFiles             badoption.Listable[string]        `json:"dhcp_lease_files,omitempty"`
 	AutoDetectInterface        bool                              `json:"auto_detect_interface,omitempty"`
+	PinEndpoints               bool                              `json:"pin_endpoints,omitempty"`
+	PinnedRoutes               badoption.Listable[netip.Addr]    `json:"pinned_routes,omitempty" examples:"192.0.2.1"`
 	OverrideAndroidVPN         bool                              `json:"override_android_vpn,omitempty"`
 	DefaultInterface           string                            `json:"default_interface,omitempty"`
 	DefaultMark                FwMark                            `json:"default_mark,omitempty"`

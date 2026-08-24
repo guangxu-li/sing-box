@@ -30,6 +30,7 @@ var (
 	_ adapter.OutboundWithPreferredRoutes = (*Endpoint)(nil)
 	_ adapter.InterfaceUpdateListener     = (*Endpoint)(nil)
 	_ adapter.OnDemandEndpoint            = (*Endpoint)(nil)
+	_ adapter.PinnedEndpoint              = (*Endpoint)(nil)
 	_ dialer.PacketDialerWithDestination  = (*Endpoint)(nil)
 )
 
@@ -44,6 +45,7 @@ type Endpoint struct {
 	dnsRouter      adapter.DNSRouter
 	logger         logger.ContextLogger
 	localAddresses []netip.Prefix
+	peerAddresses  []netip.Addr
 	endpoint       *wireguard.Endpoint
 	onDemand       bool
 	bindAccess     sync.Mutex
@@ -59,6 +61,9 @@ func NewEndpoint(ctx context.Context, router adapter.Router, logger log.ContextL
 		logger:         logger,
 		localAddresses: options.Address,
 		onDemand:       options.OnDemand,
+		peerAddresses: common.FilterNotDefault(common.Map(options.Peers, func(it option.WireGuardPeer) netip.Addr {
+			return M.ParseAddr(it.Address)
+		})),
 	}
 	if options.Detour != "" && options.ListenPort != 0 {
 		return nil, E.New("`listen_port` is conflict with `detour`")
@@ -187,6 +192,13 @@ func (w *Endpoint) updateBind(ctx context.Context) {
 
 func (w *Endpoint) PreMatchFlow(network string, destination netip.Addr) adapter.PreMatchAction {
 	return adapter.PreMatchFlow
+}
+
+// PinnedAddresses reports the peer endpoints given as literal addresses, so that
+// the transport towards them is never captured by another tunnel's default route.
+// Peers given as domains are resolved per dial and cannot be pinned here.
+func (w *Endpoint) PinnedAddresses() []netip.Addr {
+	return w.peerAddresses
 }
 
 func (w *Endpoint) PortAddresses() (netip.Addr, netip.Addr) {

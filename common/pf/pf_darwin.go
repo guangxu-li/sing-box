@@ -1,4 +1,4 @@
-package bridge
+package pf
 
 import (
 	"net"
@@ -14,55 +14,67 @@ import (
 // ship; unchanged from xnu-4570.1.46 (macOS 10.13) through xnu-12377.1.9.
 
 const (
-	pfRulesetScrub  = 0
-	pfRulesetFilter = 1
-	pfRulesetNat    = 2
+	RulesetScrub  = 0
+	RulesetFilter = 1
+	RulesetNat    = 2
+	// The kernel derives the ruleset from the rule's action, and rdr has its own,
+	// distinct from nat: pf_get_ruleset_number maps PF_RDR to PF_RULESET_RDR.
+	RulesetRDR = 4
 
-	pfActionPass  = 0
-	pfActionDrop  = 1
-	pfActionScrub = 2
-	pfActionNat   = 4
+	ActionPass  = 0
+	ActionDrop  = 1
+	ActionScrub = 2
+	ActionNat   = 4
+	ActionRDR   = 8
 
-	pfDirectionIn  = 1
-	pfDirectionOut = 2
+	DirectionIn  = 1
+	DirectionOut = 2
 
-	pfAddrTypeAddressMask      = 0
-	pfAddrTypeDynamicInterface = 2
+	AddrTypeAddressMask      = 0
+	AddrTypeDynamicInterface = 2
 
 	// xnu orders the route enum PF_NOPFROUTE, PF_FASTROUTE, PF_ROUTETO,
 	// PF_DUPTO, PF_REPLYTO; reply-to is 4, unlike OpenBSD where it is 3.
-	pfRouteActionRouteTo = 2
-	pfRouteActionReplyTo = 4
+	RouteActionRouteTo = 2
+	RouteActionReplyTo = 4
 
-	pfStateNormal = 1
+	StateNormal = 1
 
-	pfNatProxyPortLow  = 50001
-	pfNatProxyPortHigh = 65535
+	// Port comparison operators, verified against pfctl's rendering of a loaded
+	// rule: 0 none, 1 range, 2 equal, 3 not equal, 4 less, 5 less or equal.
+	OpEQ = 2
+
+	NatProxyPortLow  = 50001
+	NatProxyPortHigh = 65535
 )
 
-type pfAddr [16]byte
+type Addr [16]byte
 
-type pfAddrWrap struct {
-	Addr   pfAddr
-	Mask   pfAddr
+type AddrWrap struct {
+	Addr   Addr
+	Mask   Addr
 	_      uint64
 	Type   uint8
 	IFlags uint8
 	_      [6]byte
 }
 
-type pfRuleAddr struct {
-	Addr pfAddrWrap
-	_    [8]byte
-	Neg  uint8
-	_    [7]byte
+type RuleAddr struct {
+	Addr AddrWrap
+	// The union pf_rule_xport, in its pf_port_range form. Ports are in network
+	// byte order here, unlike Pool.ProxyPort which the kernel converts itself.
+	Port   [2]uint16
+	PortOp uint8
+	_      [3]byte
+	Neg    uint8
+	_      [7]byte
 }
 
-type pfPool struct {
+type Pool struct {
 	_          [2]uint64
 	_          uint64
 	_          [16]byte
-	_          pfAddr
+	_          Addr
 	TableIndex int32
 	ProxyPort  [2]uint16
 	PortOp     uint8
@@ -71,15 +83,15 @@ type pfPool struct {
 	_          [5]byte
 }
 
-type pfRuleUserGroup struct {
+type RuleUserGroup struct {
 	Range [2]uint32
 	Op    uint8
 	_     [3]byte
 }
 
-type pfRule struct {
-	Src            pfRuleAddr
-	Dst            pfRuleAddr
+type Rule struct {
+	Src            RuleAddr
+	Dst            RuleAddr
 	_              [8]uint64
 	Label          [64]byte
 	IfName         [16]byte
@@ -89,7 +101,7 @@ type pfRule struct {
 	MatchTagName   [64]byte
 	OverloadTable  [32]byte
 	_              [2]uint64
-	RPool          pfPool
+	RPool          Pool
 	Evaluations    uint64
 	Packets        [2]uint64
 	Bytes          [2]uint64
@@ -121,8 +133,8 @@ type pfRule struct {
 	Tag            uint16
 	MatchTag       uint16
 	_              uint16
-	UID            pfRuleUserGroup
-	GID            pfRuleUserGroup
+	UID            RuleUserGroup
+	GID            RuleUserGroup
 	RuleFlag       uint32
 	Action         uint8
 	Direction      uint8
@@ -155,8 +167,8 @@ type pfRule struct {
 	DummynetType   uint32
 }
 
-type pfPoolAddr struct {
-	Addr   pfAddrWrap
+type PoolAddr struct {
+	Addr   AddrWrap
 	_      [2]uint64
 	IfName [16]byte
 	_      uint64
@@ -169,7 +181,7 @@ type pfiocRule struct {
 	Nr         uint32
 	Anchor     [1024]byte
 	AnchorCall [1024]byte
-	Rule       pfRule
+	Rule       Rule
 }
 
 type pfiocPoolAddr struct {
@@ -182,7 +194,7 @@ type pfiocPoolAddr struct {
 	AF      uint8
 	Anchor  [1024]byte
 	_       [5]byte
-	Addr    pfPoolAddr
+	Addr    PoolAddr
 }
 
 type pfiocTransElement struct {
@@ -220,33 +232,33 @@ const (
 	diocXRollback  = iocInOut | (uint(unsafe.Sizeof(pfiocTrans{}))&iocParamMask)<<16 | 'D'<<8 | 83
 )
 
-type pfAnchorRule struct {
+type AnchorRule struct {
 	RulesetIndex int32
-	Rule         pfRule
-	Pool         pfPoolAddr
+	Rule         Rule
+	Pool         PoolAddr
 }
 
-type pfDevice struct {
+type Device struct {
 	fd int
 }
 
-func openPfDevice() (*pfDevice, error) {
+func OpenDevice() (*Device, error) {
 	fd, err := unix.Open("/dev/pf", unix.O_RDWR|unix.O_CLOEXEC, 0)
 	if err != nil {
 		return nil, E.Cause(err, "open /dev/pf")
 	}
-	return &pfDevice{fd: fd}, nil
+	return &Device{fd: fd}, nil
 }
 
-func (d *pfDevice) Close() error {
+func (d *Device) Close() error {
 	return unix.Close(d.fd)
 }
 
-func (d *pfDevice) ioctl(request uint, pointer unsafe.Pointer) error {
+func (d *Device) ioctl(request uint, pointer unsafe.Pointer) error {
 	return unixIoctlPtr(d.fd, request, pointer)
 }
 
-func (d *pfDevice) StartReference() (uint64, error) {
+func (d *Device) StartReference() (uint64, error) {
 	var token uint64
 	err := d.ioctl(uint(diocStartRef), unsafe.Pointer(&token))
 	if err != nil {
@@ -255,7 +267,7 @@ func (d *pfDevice) StartReference() (uint64, error) {
 	return token, nil
 }
 
-func (d *pfDevice) StopReference(token uint64) error {
+func (d *Device) StopReference(token uint64) error {
 	remove := pfiocRemoveToken{Token: token}
 	err := d.ioctl(uint(diocStopRef), unsafe.Pointer(&remove))
 	if err != nil {
@@ -264,16 +276,22 @@ func (d *pfDevice) StopReference(token uint64) error {
 	return nil
 }
 
-// LoadAnchor atomically replaces the anchor's scrub, nat and filter rulesets;
+// LoadAnchor atomically replaces the given rulesets of the anchor;
 // empty rules flush the anchor.
-func (d *pfDevice) LoadAnchor(anchor string, rules []pfAnchorRule) error {
-	elements := [3]pfiocTransElement{
-		{RulesetIndex: pfRulesetScrub},
-		{RulesetIndex: pfRulesetNat},
-		{RulesetIndex: pfRulesetFilter},
+func (d *Device) LoadAnchor(anchor string, rulesets []int32, rules []AnchorRule) error {
+	// Only the caller's own rulesets are opened: committing a ruleset also clears
+	// it, so touching one the caller does not use would wipe whatever else lives
+	// there. That matters for the main ruleset, which is the anchor on platforms
+	// without a stock /etc/pf.conf to nest under.
+	elements := make([]pfiocTransElement, 0, len(rulesets))
+	for _, ruleset := range rulesets {
+		elements = append(elements, pfiocTransElement{RulesetIndex: ruleset})
 	}
 	for i := range elements {
 		copy(elements[i].Anchor[:], anchor)
+	}
+	if len(elements) == 0 {
+		return nil
 	}
 	trans := pfiocTrans{
 		Size:        int32(len(elements)),
@@ -285,7 +303,7 @@ func (d *pfDevice) LoadAnchor(anchor string, rules []pfAnchorRule) error {
 		return E.Cause(err, "DIOCXBEGIN")
 	}
 	for _, rule := range rules {
-		err = d.addRule(anchor, &elements, rule)
+		err = d.addRule(anchor, elements, rule)
 		if err != nil {
 			_ = d.ioctl(uint(diocXRollback), unsafe.Pointer(&trans))
 			return err
@@ -298,13 +316,13 @@ func (d *pfDevice) LoadAnchor(anchor string, rules []pfAnchorRule) error {
 	return nil
 }
 
-func (d *pfDevice) addRule(anchor string, elements *[3]pfiocTransElement, rule pfAnchorRule) error {
+func (d *Device) addRule(anchor string, elements []pfiocTransElement, rule AnchorRule) error {
 	var pool pfiocPoolAddr
 	err := d.ioctl(uint(diocBeginAddrs), unsafe.Pointer(&pool))
 	if err != nil {
 		return E.Cause(err, "DIOCBEGINADDRS")
 	}
-	if rule.Pool != (pfPoolAddr{}) {
+	if rule.Pool != (PoolAddr{}) {
 		pool.Addr = rule.Pool
 		pool.AF = rule.Rule.AF
 		err = d.ioctl(uint(diocAddAddr), unsafe.Pointer(&pool))
@@ -312,11 +330,20 @@ func (d *pfDevice) addRule(anchor string, elements *[3]pfiocTransElement, rule p
 			return E.Cause(err, "DIOCADDADDR")
 		}
 	}
-	var ticket uint32
+	var (
+		ticket      uint32
+		ticketFound bool
+	)
 	for _, element := range elements {
 		if element.RulesetIndex == rule.RulesetIndex {
 			ticket = element.Ticket
+			ticketFound = true
 		}
+	}
+	if !ticketFound {
+		// The kernel would compare a zero ticket against the ruleset it derives from
+		// the rule's action and reject the transaction with an unexplained EBUSY.
+		return E.New("no open transaction for ruleset ", rule.RulesetIndex)
 	}
 	request := pfiocRule{
 		Ticket:     ticket,
@@ -331,7 +358,7 @@ func (d *pfDevice) addRule(anchor string, elements *[3]pfiocTransElement, rule p
 	return nil
 }
 
-func pfAddrOf(address netip.Addr) (result pfAddr) {
+func AddrOf(address netip.Addr) (result Addr) {
 	if address.Is4() {
 		addr4 := address.As4()
 		copy(result[:], addr4[:])
@@ -342,7 +369,7 @@ func pfAddrOf(address netip.Addr) (result pfAddr) {
 	return
 }
 
-func pfMaskOf(bits int, is4 bool) (result pfAddr) {
+func MaskOf(bits int, is4 bool) (result Addr) {
 	totalBits := 128
 	if is4 {
 		totalBits = 32
@@ -351,32 +378,32 @@ func pfMaskOf(bits int, is4 bool) (result pfAddr) {
 	return
 }
 
-func pfHostAddress(address netip.Addr) pfAddrWrap {
-	return pfPrefixAddress(netip.PrefixFrom(address, address.BitLen()))
+func HostAddress(address netip.Addr) AddrWrap {
+	return PrefixAddress(netip.PrefixFrom(address, address.BitLen()))
 }
 
-func pfPrefixAddress(prefix netip.Prefix) pfAddrWrap {
-	return pfAddrWrap{
-		Type: pfAddrTypeAddressMask,
-		Addr: pfAddrOf(prefix.Addr()),
-		Mask: pfMaskOf(prefix.Bits(), prefix.Addr().Is4()),
+func PrefixAddress(prefix netip.Prefix) AddrWrap {
+	return AddrWrap{
+		Type: AddrTypeAddressMask,
+		Addr: AddrOf(prefix.Addr()),
+		Mask: MaskOf(prefix.Bits(), prefix.Addr().Is4()),
 	}
 }
 
-func pfDynamicInterfaceAddress(interfaceName string, is4 bool) pfAddrWrap {
-	wrap := pfAddrWrap{
-		Type: pfAddrTypeDynamicInterface,
+func DynamicInterfaceAddress(interfaceName string, is4 bool) AddrWrap {
+	wrap := AddrWrap{
+		Type: AddrTypeDynamicInterface,
 	}
 	if is4 {
-		wrap.Mask = pfMaskOf(32, true)
+		wrap.Mask = MaskOf(32, true)
 	} else {
-		wrap.Mask = pfMaskOf(128, false)
+		wrap.Mask = MaskOf(128, false)
 	}
 	copy(wrap.Addr[:], interfaceName)
 	return wrap
 }
 
-func pfFamily(is4 bool) uint8 {
+func Family(is4 bool) uint8 {
 	if is4 {
 		return unix.AF_INET
 	}

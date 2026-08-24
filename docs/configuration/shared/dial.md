@@ -2,6 +2,10 @@
 icon: material/new-box
 ---
 
+!!! quote "Changes in sing-box 1.15.0"
+
+    :material-plus: [bind_interface_address](#bind_interface_address)
+
 !!! quote "Changes in sing-box 1.14.0"
 
     :material-alert: [domain_resolver](#domain_resolver)  
@@ -33,6 +37,7 @@ icon: material/new-box
 {
   "detour": "",
   "bind_interface": "",
+  "bind_interface_address": "",
   "inet4_bind_address": "",
   "inet6_bind_address": "",
   "bind_address_no_port": false,
@@ -74,6 +79,27 @@ If enabled, all other fields will be ignored.
 #### bind_interface
 
 The network interface to bind to.
+
+#### bind_interface_address
+
+!!! question "Since sing-box 1.15.0"
+
+!!! quote ""
+
+    Only supported on Linux, Windows and macOS.
+
+An IP prefix, e.g. `10.0.0.0/8`.
+
+Instead of a fixed name, the network interface to bind to is resolved for every connection,
+by selecting the interface which currently has an address inside the prefix.
+When multiple interfaces match, the first one is selected.
+
+This is intended for interfaces whose name is not stable, such as the tunnel interface of a
+VPN client which is assigned a different `utunN` slot on every reconnection.
+
+Connections fail if no interface currently has an address inside the prefix.
+
+Conflicts with `bind_interface` and `network_strategy`.
 
 #### inet4_bind_address
 

@@ -33,6 +33,13 @@ func (r *NetworkManager) updateNetworkEnvironment() {
 	if r.environmentUpdateTimer != nil {
 		r.environmentUpdateTimer.Stop()
 	}
+	// Runs before the change check below: a route change can drop a pinned route
+	// without altering the gateway, SSID or gateway MAC this hash is built from.
+	if pinErr := r.UpdatePinnedRoutes(); pinErr != nil {
+		// Logged rather than fatal: this runs on every route change, where a failure
+		// is usually transient and the next change retries.
+		r.logger.Warn(pinErr)
+	}
 	var defaultInterface *adapter.NetworkInterface
 	if r.interfaceMonitor != nil {
 		defaultInterface = r.DefaultNetworkInterface()

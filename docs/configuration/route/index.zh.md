@@ -4,6 +4,11 @@ icon: material/alert-decagram
 
 # 路由
 
+!!! quote "sing-box 1.15.0 中的更改"
+
+    :material-plus: [pin_endpoints](#pin_endpoints)  
+    :material-plus: [pinned_routes](#pinned_routes)
+
 !!! quote "sing-box 1.14.0 中的更改"
 
     :material-plus: [default_http_client](#default_http_client)  
@@ -40,6 +45,8 @@ icon: material/alert-decagram
     "rule_set": [],
     "final": "",
     "auto_detect_interface": false,
+    "pin_endpoints": false,
+    "pinned_routes": [],
     "override_android_vpn": false,
     "default_interface": "",
     "default_mark": 0,
@@ -87,6 +94,53 @@ icon: material/alert-decagram
 默认将出站连接绑定到默认网卡，以防止在 tun 下出现路由环路。
 
 如果设置了 `outbound.bind_interface` 设置，则不生效。
+
+#### pin_endpoints
+
+!!! question "自 sing-box 1.15.0 起"
+
+!!! quote ""
+
+    仅支持 macOS。
+
+通过物理默认网关为每个端点的远程地址保持一条主机路由，并在路由表变化时重新确认。
+
+此项防止端点自身的传输被另一个隧道的默认路由捕获。运行在另一个 WireGuard 隧道内的
+WireGuard 端点仍能完成握手，因为握手包很小，而每个完整大小的数据包都会被外层隧道的 MTU
+静默丢弃，于是端点报告已连接却不承载任何流量。
+
+目前由 `wireguard` 端点支持，适用于配置为字面地址的对端。配置为域名的对端在每次拨号时解析，
+不会被固定。
+
+网关按地址族分别解析，因为主机路由只能经由同一地址族的网关安装。当某一地址族没有经由物理接口的默认路由时，
+不为该地址族固定任何地址，以免将固定路由安装到隧道中。
+
+当某个地址已存在 sing-box 无法原样还原的路由时，将完全不固定该地址：例如经由接口而非网关的路由，
+带有 `-reject`、`-blackhole` 的路由。替换此类路由会将其销毁，因为内核按目标地址删除主机路由，
+且无法将其原样还原。由于该地址随之失去保护，而这正是此选项要防止的情况，sing-box 将拒绝启动，
+而不是在缺少保护的情况下继续运行。
+
+`-mtu` 等每路由度量值在替换过程中不会被保留，且无法事先识别：内核会在路径 MTU 发现过程中自行写入这些值，
+因此显式设置的值与探测得出的值无法区分。
+
+已指向正确网关的路由将保持不变，且不会在关闭时被移除，因为它们可能属于其他程序。由 sing-box 安装的固定路由将在其正常停止时移除。
+因崩溃而残留的固定路由会在下次运行时被视为属于其他程序：若其仍然正确则保持不变；若该次运行需要替换它，则会在该次运行停止时被还原。
+
+#### pinned_routes
+
+!!! question "自 sing-box 1.15.0 起"
+
+!!! quote ""
+
+    仅支持 macOS。
+
+需要额外固定的地址，作用与 `pin_endpoints` 对端点的作用相同。
+
+主机路由与进程无关，因此此项可覆盖 sing-box 并不知晓的程序所使用的地址，例如运行在同一台机器上、
+其传输可能被隧道捕获的另一个 VPN 客户端。`pin_endpoints` 无法推导出这些地址，因为它们不出现在任何
+sing-box 配置中。
+
+设置此项或 `pin_endpoints` 中的任意一个即可启用固定；两个列表将合并使用。
 
 #### override_android_vpn
 

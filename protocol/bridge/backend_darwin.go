@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/sagernet/sing-box/adapter"
+	"github.com/sagernet/sing-box/common/pf"
 	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing-tun"
 	"github.com/sagernet/sing/common/buf"
@@ -47,10 +48,10 @@ type backendDarwin struct {
 	writeAccess sync.Mutex
 	writeBatch  []*buf.Buffer
 
-	pfDevice *pfDevice
+	pfDevice *pf.Device
 	pfToken  uint64
 
-	currentRules []pfAnchorRule
+	currentRules []pf.AnchorRule
 
 	platform adapter.PlatformInterface
 }
@@ -122,7 +123,7 @@ func (b *backendDarwin) start() error {
 		return E.Cause(err, "enable pf")
 	}
 	dropRules := bridgeDropRules(b.tunName, b.inet4Port, b.inet6Port)
-	err = b.pfDevice.LoadAnchor(b.anchorName, dropRules)
+	err = b.pfDevice.LoadAnchor(b.anchorName, bridgeRulesets, dropRules)
 	if err != nil {
 		return E.Cause(err, "initialize bridge pf rules")
 	}
@@ -196,7 +197,7 @@ func (b *backendDarwin) Close() error {
 		}
 		if b.pfDevice != nil && b.anchorName != "" {
 			b.egressAccess.Lock()
-			_ = b.pfDevice.LoadAnchor(b.anchorName, nil)
+			_ = b.pfDevice.LoadAnchor(b.anchorName, bridgeRulesets, nil)
 			b.egressAccess.Unlock()
 		}
 		restoreDarwinForwarding(b.forwardingRestore)
@@ -341,7 +342,7 @@ func (b *backendDarwin) syncEgress() {
 		}
 		return
 	}
-	err := b.pfDevice.LoadAnchor(b.anchorName, rules)
+	err := b.pfDevice.LoadAnchor(b.anchorName, bridgeRulesets, rules)
 	if err != nil {
 		b.logger.Debug(E.Cause(err, "apply bridge egress ", egress))
 		return
@@ -358,7 +359,7 @@ func (b *backendDarwin) syncEgress() {
 }
 
 func (b *backendDarwin) enablePf() error {
-	device, err := openPfDevice()
+	device, err := pf.OpenDevice()
 	if err != nil {
 		return err
 	}

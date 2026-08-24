@@ -748,6 +748,12 @@
         "bind_interface": {
           "type": "string"
         },
+        "bind_interface_address": {
+          "type": "string",
+          "examples": [
+            "10.0.0.0/8"
+          ]
+        },
         "inet4_bind_address": {
           "type": "string"
         },
@@ -1907,6 +1913,12 @@
             "bind_interface": {
               "type": "string"
             },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
+            },
             "inet4_bind_address": {
               "type": "string"
             },
@@ -2066,6 +2078,12 @@
             },
             "bind_interface": {
               "type": "string"
+            },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
             },
             "inet4_bind_address": {
               "type": "string"
@@ -2245,6 +2263,12 @@
             "bind_interface": {
               "type": "string"
             },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
+            },
             "inet4_bind_address": {
               "type": "string"
             },
@@ -2379,6 +2403,12 @@
             "bind_interface": {
               "type": "string"
             },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
+            },
             "inet4_bind_address": {
               "type": "string"
             },
@@ -2508,6 +2538,12 @@
             },
             "bind_interface": {
               "type": "string"
+            },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
             },
             "inet4_bind_address": {
               "type": "string"
@@ -2700,6 +2736,12 @@
             "bind_interface": {
               "type": "string"
             },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
+            },
             "inet4_bind_address": {
               "type": "string"
             },
@@ -2870,6 +2912,12 @@
             "bind_interface": {
               "type": "string"
             },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
+            },
             "inet4_bind_address": {
               "type": "string"
             },
@@ -2991,6 +3039,12 @@
             },
             "bind_interface": {
               "type": "string"
+            },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
             },
             "inet4_bind_address": {
               "type": "string"
@@ -3116,6 +3170,12 @@
             },
             "bind_interface": {
               "type": "string"
+            },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
             },
             "inet4_bind_address": {
               "type": "string"
@@ -3272,6 +3332,12 @@
         },
         "bind_interface": {
           "type": "string"
+        },
+        "bind_interface_address": {
+          "type": "string",
+          "examples": [
+            "10.0.0.0/8"
+          ]
         },
         "inet4_bind_address": {
           "type": "string"
@@ -3441,6 +3507,12 @@
             },
             "bind_interface": {
               "type": "string"
+            },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
             },
             "inet4_bind_address": {
               "type": "string"
@@ -3721,6 +3793,12 @@
             },
             "bind_interface": {
               "type": "string"
+            },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
             },
             "inet4_bind_address": {
               "type": "string"
@@ -4413,6 +4491,12 @@
             "bind_interface": {
               "type": "string"
             },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
+            },
             "inet4_bind_address": {
               "type": "string"
             },
@@ -4704,6 +4788,12 @@
             "bind_interface": {
               "type": "string"
             },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
+            },
             "inet4_bind_address": {
               "type": "string"
             },
@@ -4859,6 +4949,12 @@
         },
         "bind_interface": {
           "type": "string"
+        },
+        "bind_interface_address": {
+          "type": "string",
+          "examples": [
+            "10.0.0.0/8"
+          ]
         },
         "inet4_bind_address": {
           "type": "string"
@@ -5032,6 +5128,12 @@
             },
             "bind_interface": {
               "type": "string"
+            },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
             },
             "inet4_bind_address": {
               "type": "string"
@@ -5994,6 +6096,12 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 65535
+            },
+            "dns_hijack_loopback": {
+              "type": "boolean"
+            },
+            "dns_hijack_exclude_source": {
+              "type": "string"
             }
           },
           "required": [
@@ -8206,6 +8314,12 @@
         "bind_interface": {
           "type": "string"
         },
+        "bind_interface_address": {
+          "type": "string",
+          "examples": [
+            "10.0.0.0/8"
+          ]
+        },
         "inet4_bind_address": {
           "type": "string"
         },
@@ -8614,6 +8728,12 @@
         },
         "bind_interface": {
           "type": "string"
+        },
+        "bind_interface_address": {
+          "type": "string",
+          "examples": [
+            "10.0.0.0/8"
+          ]
         },
         "inet4_bind_address": {
           "type": "string"
@@ -10772,6 +10892,12 @@
             "bind_interface": {
               "type": "string"
             },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
+            },
             "inet4_bind_address": {
               "type": "string"
             },
@@ -10954,6 +11080,12 @@
             "bind_interface": {
               "type": "string"
             },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
+            },
             "inet4_bind_address": {
               "type": "string"
             },
@@ -11067,6 +11199,12 @@
             },
             "bind_interface": {
               "type": "string"
+            },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
             },
             "inet4_bind_address": {
               "type": "string"
@@ -11204,6 +11342,12 @@
             },
             "bind_interface": {
               "type": "string"
+            },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
             },
             "inet4_bind_address": {
               "type": "string"
@@ -11452,6 +11596,12 @@
             },
             "bind_interface": {
               "type": "string"
+            },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
             },
             "inet4_bind_address": {
               "type": "string"
@@ -11721,6 +11871,12 @@
             "bind_interface": {
               "type": "string"
             },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
+            },
             "inet4_bind_address": {
               "type": "string"
             },
@@ -11946,6 +12102,12 @@
             "bind_interface": {
               "type": "string"
             },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
+            },
             "inet4_bind_address": {
               "type": "string"
             },
@@ -12149,6 +12311,12 @@
             "bind_interface": {
               "type": "string"
             },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
+            },
             "inet4_bind_address": {
               "type": "string"
             },
@@ -12289,6 +12457,12 @@
                 },
                 "bind_interface": {
                   "type": "string"
+                },
+                "bind_interface_address": {
+                  "type": "string",
+                  "examples": [
+                    "10.0.0.0/8"
+                  ]
                 },
                 "inet4_bind_address": {
                   "type": "string"
@@ -12457,6 +12631,12 @@
                 "bind_interface": {
                   "type": "string"
                 },
+                "bind_interface_address": {
+                  "type": "string",
+                  "examples": [
+                    "10.0.0.0/8"
+                  ]
+                },
                 "inet4_bind_address": {
                   "type": "string"
                 },
@@ -12619,6 +12799,12 @@
             },
             "bind_interface": {
               "type": "string"
+            },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
             },
             "inet4_bind_address": {
               "type": "string"
@@ -12801,6 +12987,12 @@
             },
             "bind_interface": {
               "type": "string"
+            },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
             },
             "inet4_bind_address": {
               "type": "string"
@@ -13017,6 +13209,12 @@
             "bind_interface": {
               "type": "string"
             },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
+            },
             "inet4_bind_address": {
               "type": "string"
             },
@@ -13148,6 +13346,12 @@
             },
             "bind_interface": {
               "type": "string"
+            },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
             },
             "inet4_bind_address": {
               "type": "string"
@@ -13303,6 +13507,12 @@
             },
             "bind_interface": {
               "type": "string"
+            },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
             },
             "inet4_bind_address": {
               "type": "string"
@@ -13556,6 +13766,12 @@
             "bind_interface": {
               "type": "string"
             },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
+            },
             "inet4_bind_address": {
               "type": "string"
             },
@@ -13716,6 +13932,12 @@
             },
             "bind_interface": {
               "type": "string"
+            },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
             },
             "inet4_bind_address": {
               "type": "string"
@@ -14261,6 +14483,28 @@
         },
         "auto_detect_interface": {
           "type": "boolean"
+        },
+        "pin_endpoints": {
+          "type": "boolean"
+        },
+        "pinned_routes": {
+          "anyOf": [
+            {
+              "type": "string",
+              "examples": [
+                "192.0.2.1"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "examples": [
+                  "192.0.2.1"
+                ]
+              }
+            }
+          ]
         },
         "override_android_vpn": {
           "type": "boolean"
@@ -15025,6 +15269,12 @@
             },
             "bind_interface": {
               "type": "string"
+            },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
             },
             "inet4_bind_address": {
               "type": "string"
@@ -15795,6 +16045,12 @@
                         "bind_interface": {
                           "type": "string"
                         },
+                        "bind_interface_address": {
+                          "type": "string",
+                          "examples": [
+                            "10.0.0.0/8"
+                          ]
+                        },
                         "inet4_bind_address": {
                           "type": "string"
                         },
@@ -15976,6 +16232,12 @@
                           },
                           "bind_interface": {
                             "type": "string"
+                          },
+                          "bind_interface_address": {
+                            "type": "string",
+                            "examples": [
+                              "10.0.0.0/8"
+                            ]
                           },
                           "inet4_bind_address": {
                             "type": "string"
@@ -16627,6 +16889,12 @@
             "bind_interface": {
               "type": "string"
             },
+            "bind_interface_address": {
+              "type": "string",
+              "examples": [
+                "10.0.0.0/8"
+              ]
+            },
             "inet4_bind_address": {
               "type": "string"
             },
@@ -16919,6 +17187,12 @@
         },
         "bind_interface": {
           "type": "string"
+        },
+        "bind_interface_address": {
+          "type": "string",
+          "examples": [
+            "10.0.0.0/8"
+          ]
         },
         "inet4_bind_address": {
           "type": "string"

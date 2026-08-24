@@ -5,6 +5,7 @@ import (
 	"os"
 	"slices"
 
+	"github.com/sagernet/sing-box/common/pf"
 	E "github.com/sagernet/sing/common/exceptions"
 	"github.com/sagernet/sing/common/logger"
 
@@ -26,9 +27,9 @@ type Service struct {
 	inet4Local     netip.Addr
 	inet6Local     netip.Addr
 	anchorName     string
-	pfDevice       *pfDevice
+	pfDevice       *pf.Device
 	pfToken        uint64
-	currentRules   []pfAnchorRule
+	currentRules   []pf.AnchorRule
 }
 
 func NewService(options ServiceOptions) (*Service, error) {
@@ -91,7 +92,7 @@ func (s *Service) start() error {
 		s.logger.Debug(E.Cause(err, "IPv6 bridge routing unavailable, disabling IPv6 forwarding"))
 		s.inet6Port = netip.Addr{}
 	}
-	device, err := openPfDevice()
+	device, err := pf.OpenDevice()
 	if err != nil {
 		return E.Cause(err, "enable pf")
 	}
@@ -102,7 +103,7 @@ func (s *Service) start() error {
 	}
 	s.pfToken = token
 	dropRules := bridgeDropRules(s.tunName, s.inet4Port, s.inet6Port)
-	err = s.pfDevice.LoadAnchor(s.anchorName, dropRules)
+	err = s.pfDevice.LoadAnchor(s.anchorName, bridgeRulesets, dropRules)
 	if err != nil {
 		return E.Cause(err, "initialize bridge pf rules")
 	}
@@ -120,7 +121,7 @@ func (s *Service) syncEgressLocked() error {
 	if slices.Equal(rules, s.currentRules) {
 		return buildErr
 	}
-	err := s.pfDevice.LoadAnchor(s.anchorName, rules)
+	err := s.pfDevice.LoadAnchor(s.anchorName, bridgeRulesets, rules)
 	if err != nil {
 		return E.Cause(err, "apply bridge egress ", s.egressName)
 	}
@@ -142,7 +143,7 @@ func (s *Service) Close() error {
 	if s.pfDevice != nil {
 		// anchorName is set before pfDevice is opened, so a non-nil pfDevice means
 		// it holds the intended target (the sub-anchor on macOS, "" on iOS).
-		_ = s.pfDevice.LoadAnchor(s.anchorName, nil)
+		_ = s.pfDevice.LoadAnchor(s.anchorName, bridgeRulesets, nil)
 		if s.pfToken != 0 {
 			_ = s.pfDevice.StopReference(s.pfToken)
 		}
@@ -157,6 +158,12 @@ func (s *Service) Close() error {
 	}
 	return nil
 }
+
+// bridgeRulesets are the rulesets the bridge owns. The rdr ruleset is deliberately
+// absent: as bridgeAnchor explains, the anchor is the main ruleset where there is
+// no /etc/pf.conf, and committing rdr there would clear rules the bridge does not
+// own.
+var bridgeRulesets = []int32{pf.RulesetScrub, pf.RulesetNat, pf.RulesetFilter}
 
 // The stock macOS /etc/pf.conf ends its main ruleset with wildcard
 // nat/rdr/scrub/anchor references to "com.apple/*", so rules loaded into a

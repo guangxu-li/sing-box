@@ -2,6 +2,10 @@
 icon: material/new-box
 ---
 
+!!! quote "sing-box 1.15.0 中的更改"
+
+    :material-plus: [bind_interface_address](#bind_interface_address)
+
 !!! quote "sing-box 1.14.0 中的更改"
 
     :material-alert: [domain_resolver](#domain_resolver)  
@@ -33,6 +37,7 @@ icon: material/new-box
 {
   "detour": "",
   "bind_interface": "",
+  "bind_interface_address": "",
   "inet4_bind_address": "",
   "inet6_bind_address": "",
   "bind_address_no_port": false,
@@ -74,6 +79,26 @@ icon: material/new-box
 #### bind_interface
 
 要绑定到的网络接口。
+
+#### bind_interface_address
+
+!!! question "自 sing-box 1.15.0 起"
+
+!!! quote ""
+
+    仅支持 Linux、Windows 和 macOS。
+
+一个 IP 前缀，如 `10.0.0.0/8`。
+
+与固定的接口名称不同，要绑定到的网络接口将在每次连接时解析，
+选择当前拥有该前缀内地址的接口。
+当多个接口匹配时，将选择第一个接口。
+
+此项适用于名称不固定的接口，例如每次重新连接时被分配到不同 `utunN` 槽位的 VPN 客户端隧道接口。
+
+如果当前没有接口拥有该前缀内的地址，连接将失败。
+
+与 `bind_interface` 和 `network_strategy` 冲突。
 
 #### inet4_bind_address
 

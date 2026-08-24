@@ -5,13 +5,16 @@ import (
 
 	E "github.com/sagernet/sing/common/exceptions"
 	"github.com/sagernet/sing/common/json"
+	"github.com/sagernet/sing/common/json/badoption"
 )
 
 type DirectInboundOptions struct {
 	ListenOptions
-	Network         NetworkList `json:"network,omitempty"`
-	OverrideAddress string      `json:"override_address,omitempty"`
-	OverridePort    uint16      `json:"override_port,omitempty"`
+	Network                NetworkList     `json:"network,omitempty"`
+	OverrideAddress        string          `json:"override_address,omitempty"`
+	OverridePort           uint16          `json:"override_port,omitempty"`
+	DNSHijackLoopback      bool            `json:"dns_hijack_loopback,omitempty"`
+	DNSHijackExcludeSource *badoption.Addr `json:"dns_hijack_exclude_source,omitempty"`
 }
 
 type _DirectOutboundOptions struct {
